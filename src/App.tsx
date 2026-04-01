@@ -34,7 +34,8 @@ const Navbar = ({ activePage, onNavigate }: { activePage: string, onNavigate: (p
           { id: 'home', label: 'Inicio' },
           { id: 'rx', label: 'Radiografía' },
           { id: 'ahorro', label: 'Ahorro' },
-          { id: 'invertir', label: 'Invertir' }
+          { id: 'invertir', label: 'Invertir' },
+          { id: 'chat', label: 'Chat AI' }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -687,6 +688,129 @@ const InvertirPage = () => {
 
 // --- Main App ---
 
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+const ChatPage = ({ rxData }: { rxData: any }) => {
+  const [messages, setMessages] = useState<{ role: 'user' | 'model', text: string }[]>([
+    { role: 'model', text: '¡Hola! Soy tu asistente de MiPlata. ¿En qué puedo ayudarte hoy con tus finanzas?' }
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setIsLoading(true);
+
+    try {
+      const context = rxData ? 
+        `El usuario ha completado su radiografía financiera. Sus ingresos totales son ${rxData.totalIngresos}, sus gastos totales son ${rxData.totalGastos} y su saldo libre es ${rxData.saldoLibre}.` : 
+        "El usuario aún no ha completado su radiografía financiera.";
+
+      const chat = ai.chats.create({
+        model: "gemini-3-flash-preview",
+        config: {
+          systemInstruction: `Eres el asistente inteligente de "MiPlata", una app de finanzas para auxiliares de enfermería en Colombia. 
+          Tu tono es amable, empático, claro y sencillo. No uses jerga bancaria complicada. 
+          Ayuda al usuario con dudas sobre ahorro, inversión (CDTs, fiducias), presupuesto y cómo mejorar su situación financiera.
+          ${context}
+          Responde siempre en español de Colombia, de forma cercana pero profesional.`,
+        },
+      });
+
+      const result = await chat.sendMessageStream({ message: userMsg });
+      
+      let fullText = "";
+      setMessages(prev => [...prev, { role: 'model', text: "" }]);
+
+      for await (const chunk of result) {
+        const chunkText = chunk.text || "";
+        fullText += chunkText;
+        setMessages(prev => {
+          const newMsgs = [...prev];
+          newMsgs[newMsgs.length - 1] = { role: 'model', text: fullText };
+          return newMsgs;
+        });
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages(prev => [...prev, { role: 'model', text: "Lo siento, tuve un problema al procesar tu mensaje. ¿Podrías intentar de nuevo?" }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-[460px] mx-auto px-5 py-6 h-[calc(100vh-100px)] flex flex-col"
+    >
+      <div className="mb-4">
+        <h2 className="text-[17px] font-bold">Asistente MiPlata</h2>
+        <p className="text-[12px] text-[#6b6b6b]">Resuelve tus dudas financieras al instante</p>
+      </div>
+
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 scrollbar-hide"
+      >
+        {messages.map((msg, i) => (
+          <div 
+            key={i} 
+            className={cn(
+              "flex",
+              msg.role === 'user' ? "justify-end" : "justify-start"
+            )}
+          >
+            <div 
+              className={cn(
+                "max-w-[85%] rounded-2xl p-3 text-[13px] leading-relaxed",
+                msg.role === 'user' 
+                  ? "bg-brand-400 text-white rounded-tr-none" 
+                  : "bg-white border border-black/10 text-[#1a1a1a] rounded-tl-none"
+              )}
+            >
+              {msg.text || <span className="animate-pulse">...</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="relative">
+        <input 
+          type="text" 
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          placeholder="Escribe tu duda aquí..."
+          className="w-full h-12 border border-black/15 rounded-2xl px-4 pr-12 text-sm bg-white outline-none focus:border-brand-400 transition-colors"
+          disabled={isLoading}
+        />
+        <button 
+          onClick={handleSend}
+          disabled={isLoading || !input.trim()}
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-brand-400 text-white rounded-xl flex items-center justify-center disabled:opacity-50 transition-opacity"
+        >
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
 export default function App() {
   const [activePage, setActivePage] = useState('home');
   const [rxData, setRxData] = useState<any>(null);
@@ -713,6 +837,9 @@ export default function App() {
           )}
           {activePage === 'invertir' && (
             <InvertirPage />
+          )}
+          {activePage === 'chat' && (
+            <ChatPage rxData={rxData} />
           )}
         </AnimatePresence>
       </main>
