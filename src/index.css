@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-brand-50: #E1F5EE;
+  --color-brand-100: #9FE1CB;
+  --color-brand-400: #1D9E75;
+  --color-brand-600: #0F6E56;
+  --color-brand-800: #085041;
+  --color-brand-900: #04342C;
+}
+
+@layer base {
+  body {
+    @apply bg-[#f2f1ee] text-[#1a1a1a] font-sans antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white border border-black/10 rounded-2xl p-5 shadow-sm;
+  }
+  .btn-primary {
+    @apply w-full py-3.5 bg-brand-400 hover:bg-brand-600 text-white rounded-xl font-semibold transition-colors;
+  }
+  .btn-secondary {
+    @apply flex-1 py-3 bg-transparent border border-black/15 rounded-xl text-[#6b6b6b] font-medium transition-colors hover:bg-black/5;
+  }
+  .input-field {
+    @apply w-full h-10 border border-black/15 rounded-xl px-3 text-sm bg-white outline-none focus:border-brand-400 transition-colors;
+  }
+}
